@@ -1,0 +1,118 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <scm class="hudson.plugins.git.GitSCM">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <name></name>
+        <refspec></refspec>
+        <url>git@github.com:ericsmith66/appbuilder.git</url>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <disableSubmodules>false</disableSubmodules>
+    <recursiveSubmodules>false</recursiveSubmodules>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <authorOrCommitter>false</authorOrCommitter>
+    <clean>false</clean>
+    <wipeOutWorkspace>false</wipeOutWorkspace>
+    <pruneBranches>false</pruneBranches>
+    <remotePoll>false</remotePoll>
+    <ignoreNotifyCommit>false</ignoreNotifyCommit>
+    <buildChooser class="hudson.plugins.git.util.DefaultBuildChooser"/>
+    <gitTool>Default</gitTool>
+    <submoduleCfg class="list"/>
+    <relativeTargetDir></relativeTargetDir>
+    <reference></reference>
+    <excludedRegions></excludedRegions>
+    <excludedUsers></excludedUsers>
+    <gitConfigName></gitConfigName>
+    <gitConfigEmail></gitConfigEmail>
+    <skipTag>false</skipTag>
+    <includedRegions></includedRegions>
+    <scmName></scmName>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers class="vector">
+    <hudson.triggers.SCMTrigger>
+      <spec>*/1 * * * *</spec>
+    </hudson.triggers.SCMTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#setup config files
+cp $WORKSPACE/config/node_env_sample.rb $WORKSPACE/config/node_env.rb
+cp $WORKSPACE/config/database_ci.yml $WORKSPACE/config/database.yml
+sed -i &apos;&apos; &apos;s/onit_test/onit_ci_appbuilder_staging_cuke/g&apos; $WORKSPACE/config/database.yml
+cp $WORKSPACE/config/mongoid_ci.yml $WORKSPACE/config/mongoid.yml
+sed -i &apos;&apos; &apos;s/onit_test/onit_ci_appbuilder_staging_cuke/g&apos; $WORKSPACE/config/mongoid.yml</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#setup database configuration
+#remove old db seeds
+rm -rf $WORKSPACE/db/demo/mongo_seed
+rm -f $WORKSPACE/db/demo/seed.sql 
+#copy over new db seeds
+cp $WORKSPACE/../../../db/dev_base/seed.sql.gz $WORKSPACE/db/demo/
+cp $WORKSPACE/../../../db/dev_base/mongo_seed.tar.gz $WORKSPACE/db/demo/
+cd $WORKSPACE/db/demo/ &amp;&amp; gunzip seed.sql.gz 
+cd $WORKSPACE/db/demo/ &amp;&amp; tar zxvf $WORKSPACE/db/demo/mongo_seed.tar.gz
+</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#clean up results directory
+mkdir -p $WORKSPACE/tmp/capybara
+mkdir -p $WORKSPACE/cucumber_results
+rm -f $WORKSPACE/tmp/capybara/*
+rm -f $WORKSPACE/cucumber_results/*
+touch $WORKSPACE/cucumber_results/nothing.txt</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>bundle install</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>env</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#execute reseed rake task for ci
+RAILS_ENV=test rake db:create --trace
+RAILS_ENV=test DB_PATH=$WORKSPACE/db/demo/seed.sql rake db:test:prepare --trace
+#execute scripts
+bundle exec cucumber --profile ci</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers>
+    <hudson.tasks.ArtifactArchiver>
+      <artifacts>$WORKSPACE/tmp/capybara/*</artifacts>
+      <excludes>$WORKSPACE/tmp/capybara/nothing.txt</excludes>
+      <latestOnly>false</latestOnly>
+    </hudson.tasks.ArtifactArchiver>
+    <hudson.tasks.junit.JUnitResultArchiver>
+      <testResults>cucumber_results/*.xml</testResults>
+      <keepLongStdio>false</keepLongStdio>
+      <testDataPublishers/>
+    </hudson.tasks.junit.JUnitResultArchiver>
+  </publishers>
+  <buildWrappers>
+    <ruby-proxy-object>
+      <ruby-object ruby-class="Jenkins::Plugin::Proxies::BuildWrapper" pluginid="rvm">
+        <pluginid pluginid="rvm" ruby-class="String">rvm</pluginid>
+        <object ruby-class="RvmWrapper" pluginid="rvm">
+          <impl pluginid="rvm" ruby-class="String">1.9.3@ci_appbuilder_master_cuke</impl>
+        </object>
+      </ruby-object>
+    </ruby-proxy-object>
+  </buildWrappers>
+</project>
